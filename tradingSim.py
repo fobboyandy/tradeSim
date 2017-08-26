@@ -53,47 +53,6 @@ def addToPortfolio(tickerName, price, shares):
         
     savePortfolio()
     return
-	# transactionFee = shares * 0.005
-	
-	# cost = price * shares;
-	# if(shares == 0):
-		# return
-	
-	# #selling
-	# elif(shares < 0):
-		# portfolioIndex = getStockIndex(tickerName)
-		# if(portfolioIndex != -1):
-			# totalShares = portfolio[portfolioIndex][2] + shares
-			# if(totalShares < 0):
-				# print("You don't have enough shares to sell!")
-				# return
-			# elif(totalShares == 0):
-				# del portfolio[portfolioIndex]
-			# else:
-				# portfolio[portfolioIndex] = (tickerName, portfolio[portfolioIndex][1] + cost, totalShares)	
-		# else:
-			# print("You don't have any shares to sell!")
-			# return
-	# #buying
-	# else:
-		# #has enough money?
-		# if(float(cost + transactionFee) <= float(cash)):
-			# portfolioIndex = getStockIndex(tickerName)
-			# if(portfolioIndex != -1):
-				# totalShares = portfolio[portfolioIndex][2] + shares
-				# portfolio[portfolioIndex] = (tickerName, portfolio[portfolioIndex][1] + cost, totalShares)	
-			# else:
-				# portfolio.append((tickerName, cost, shares))
-		# else:
-			# print("Cash is too low!");
-	
-	# #cash will increase if cost is negative and fee will always be subtracted
-	# cash = cash - cost - transactionFee
-
-	# savePortfolio()
-    # return
-
-    
 def priceToFloat(priceStr):
 	priceFloat = ''
 	for i in range(0, len(priceStr)):
@@ -104,26 +63,28 @@ def priceToFloat(priceStr):
 			
 
 def getCurrentStockPrice(ticker):
-	price = -1
-	priceFloat = float(-1)
-	page = requests.get('https://www.google.com/finance?q=%3A' + ticker)
-	pageContent = str(page.content)
+    price = -1
+    priceFloat = float(-1)
+
+    while(priceFloat == -1):
+        print("Getting price...\n")
+        page = requests.get('https://www.google.com/finance?q=%3A' + ticker)
+        pageContent = str(page.content)
+        
+        priceStartIdx = pageContent.find("meta itemprop=\"price\"")
+        
+        contentStartIdx = pageContent.find("content", priceStartIdx)
+        if(priceStartIdx != -1 and contentStartIdx != -1):
+            
+            firstQuote = pageContent.find("\"", contentStartIdx)
+            secondQuote = pageContent.find("\"", firstQuote + 1) 
+            
+            if(firstQuote != -1 and secondQuote != -1):
+                price = pageContent[firstQuote + 1: secondQuote]
+                price = price.replace(',', '')
+                priceFloat = float(price)
 	
-	priceStartIdx = pageContent.find("meta itemprop=\"price\"")
-	
-	contentStartIdx = pageContent.find("content", priceStartIdx)
-	
-	if(priceStartIdx != -1 and contentStartIdx != -1):
-		
-		firstQuote = pageContent.find("\"", contentStartIdx)
-		secondQuote = pageContent.find("\"", firstQuote + 1) 
-		
-		if(firstQuote != -1 and secondQuote != -1):
-			price = pageContent[firstQuote + 1: secondQuote]
-			price = price.replace(',', '')
-			priceFloat = float(price)
-	
-	return priceFloat
+    return priceFloat
 
 def loadPortfolio():
 	myCsv = open(fileName, 'r+')
@@ -187,7 +148,8 @@ def getPercentGain(tickerIndex):
 def printPortfolio():
 	print("\nCash: $", cash, "\n")
 	currentPortfolioValue = getPortfolioValue()
-	print("Portfolio Value: $", currentPortfolioValue, " (", (currentPortfolioValue - 25000) * 100/ 25000,  "%)\n")
+    #don't print portfolio value for now. it messes with the trading behavior
+    # print("Portfolio Value: $", currentPortfolioValue, " (", (currentPortfolioValue - 25000) * 100/ 25000,  "%)\n")
 	for i in range(0, len(portfolio)):
 		print("Name: ", portfolio[i][0])
 		print("Avg Price: $", portfolio[i][1])  
@@ -277,10 +239,16 @@ def sellStock():
                 print("You don't have any", ticker, "stocks to sell!")
                 return
             shares = int(input("How many " + ticker + " would you like to sell?"))
+            if(shares > portfolio[portfolioIndex][2]):
+                print("You don't have enough shares to sell!\n")
+                return
             marketSell(ticker, shares)
         elif(option == "2"):
             if(portfolioIndex == -1):
                 print("You don't have any", ticker, "stocks to sell!")
+                return
+            if(shares > portfolio[portfolioIndex][2]):
+                print("You don't have enough shares to sell!\n")
                 return
             shares = int(input("How many " + ticker + " would you like to sell?"))
             limitPrice = float(input("Enter your limit price: "))
@@ -308,7 +276,6 @@ def limitSell(tickerName, limitPrice, shares):
     price = getCurrentStockPrice(tickerName)
     while(price < limitPrice):
         price = getCurrentStockPrice(tickerName)
-    
     transactionFee = shares * 0.005
     cost = price * abs(shares)
     cash = cash + cost - transactionFee
